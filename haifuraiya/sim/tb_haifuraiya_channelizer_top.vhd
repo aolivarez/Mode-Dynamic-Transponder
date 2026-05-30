@@ -229,22 +229,25 @@ begin
             end loop;
         end procedure;
 
-        -- Wait until at least 'n' new complete output frames have passed
-        -- Bounded by a generous timeout so a stalled DUT can't hang the
-        -- entire test run; on timeout we print a diagnostic and continue.
+        -- Wait until at least 'n' new complete output frames have passed.
+        -- The SDF FFT pipeline emits frame N's bins during frame (N+1)'s
+        -- input window, so we have to keep feeding samples for the
+        -- previous frame's channel_last to fire. We feed zero samples
+        -- while waiting; that drives one more filterbank frame every
+        -- M_DECIMATION samples and flushes the previous FFT frame.
         procedure wait_frames(n : positive) is
-            variable target : natural;
-            constant TIMEOUT_CYCLES : positive := 200_000;  -- 2 ms at 100 MHz
-            variable cycles : natural := 0;
+            variable target           : natural;
+            constant TIMEOUT_SAMPLES  : positive := 4096;
+            variable samples_consumed : natural := 0;
         begin
             target := frame_seq + n;
             while frame_seq < target loop
-                wait until rising_edge(clk);
-                cycles := cycles + 1;
-                if cycles >= TIMEOUT_CYCLES then
+                feed_sample(0, 0);
+                samples_consumed := samples_consumed + 1;
+                if samples_consumed >= TIMEOUT_SAMPLES then
                     report "wait_frames TIMEOUT after " &
-                           integer'image(cycles) &
-                           " cycles. target=" & integer'image(target) &
+                           integer'image(samples_consumed) &
+                           " flush samples. target=" & integer'image(target) &
                            " frame_seq=" & integer'image(frame_seq) &
                            " frame_dropped_count=" &
                            integer'image(frame_dropped_count)
@@ -446,9 +449,9 @@ begin
         if peak_bin = 0 then
             report "TEST 2 PASS: DC energy in bin 0" severity note;
         else
-            report "TEST 2 NOTE: DC peak in bin " & integer'image(peak_bin) &
+            report "TEST 2 FAIL: DC peak in bin " & integer'image(peak_bin) &
                    " (expected 0). Check FFT bin ordering convention."
-                severity warning;
+                severity failure;
         end if;
 
         -- Settle with zeros before next test
@@ -485,8 +488,8 @@ begin
                 report "  TEST 3.k=" & integer'image(expected_bin) & " PASS"
                     severity note;
             else
-                report "  TEST 3.k=" & integer'image(expected_bin) & " NOTE: peak at " &
-                       integer'image(peak_bin) severity warning;
+                report "  TEST 3.k=" & integer'image(expected_bin) & " FAIL: peak at " &
+                       integer'image(peak_bin) severity failure;
             end if;
         end loop;
 
@@ -548,12 +551,12 @@ begin
             if rejection_dB > 25.0 then
                 report "TEST 5 PASS: rejection > 25 dB" severity note;
             else
-                report "TEST 5 NOTE: rejection lower than expected (" &
-                       real'image(rejection_dB) & " dB)" severity warning;
+                report "TEST 5 FAIL: rejection lower than expected (" &
+                       real'image(rejection_dB) & " dB)" severity failure;
             end if;
         else
-            report "TEST 5 NOTE: zero power, cannot compute dB rejection"
-                severity warning;
+            report "TEST 5 FAIL: zero power, cannot compute dB rejection"
+                severity failure;
         end if;
 
         ---------------------------------------------------------------------
@@ -586,8 +589,10 @@ begin
             report "TEST 6 PASS: clean carrier capture, no frame drops"
                 severity note;
         else
-            report "TEST 6 NOTE: review carrier capture and drop count"
-                severity warning;
+            report "TEST 6 FAIL: peak_bin=" & integer'image(peak_bin) &
+                   " (expected 16), frame_dropped_count=" &
+                   integer'image(frame_dropped_count)
+                severity failure;
         end if;
 
         ---------------------------------------------------------------------

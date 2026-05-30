@@ -107,9 +107,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-library std;
-use std.textio.all;
-use ieee.std_logic_textio.all;
+-- Coefficients come from a generated VHDL-93 package, not a runtime hex
+-- file. See haifuraiya_coeffs_pkg.vhd / gen_coeff_pkg.py.
+use work.haifuraiya_coeffs_pkg.all;
 
 entity fir_branch_parallel is
     generic (
@@ -127,8 +127,9 @@ entity fir_branch_parallel is
         -- For Haifuraiya: 16 + 16 + 5 = 37 minimum; using 40 with margin
         ACCUM_WIDTH     : positive := 40;
 
-        -- Coefficient hex file (one coefficient per line, branch-major)
-        COEFF_FILE      : string;
+        -- Kept for upstream-instantiation compatibility; ignored at
+        -- elaboration. Coefficients come from haifuraiya_coeffs_pkg.
+        COEFF_FILE      : string  := "";
 
         -- This branch's index within the filterbank.
         -- Coefficients are read from file lines:
@@ -158,54 +159,21 @@ architecture rtl of fir_branch_parallel is
         signed(COEFF_WIDTH - 1 downto 0);
 
     ---------------------------------------------------------------------------
-    -- Read this branch's coefficient slice at elaboration
-    --
-    -- The hex file is branch-major: branch k's TAPS_PER_BRANCH coefficients
-    -- occupy lines k*TAPS_PER_BRANCH .. (k+1)*TAPS_PER_BRANCH - 1.
-    -- We skip earlier branches' lines, then read our taps in order.
+    -- Pull this branch's coefficient slice out of the embedded flat array.
+    -- Layout is branch-major (matches the original .hex file order):
+    -- branch B tap T at HAIFURAIYA_COEFFS_FLAT(B * TAPS_PER_BRANCH + T).
     ---------------------------------------------------------------------------
-    impure function read_branch_coeffs return coeff_array_t is
-        file f             : text;
-        variable line_v    : line;
-        variable hex_v     : std_logic_vector(COEFF_WIDTH - 1 downto 0);
-        variable result_v  : coeff_array_t := (others => (others => '0'));
-        variable status    : file_open_status;
-        constant SKIP_LINES : natural := BRANCH_INDEX * TAPS_PER_BRANCH;
+    function get_branch_coeffs return coeff_array_t is
+        variable r : coeff_array_t;
     begin
-        file_open(status, f, COEFF_FILE, read_mode);
-        assert status = open_ok
-            report "fir_branch_parallel(BRANCH_INDEX=" &
-                   integer'image(BRANCH_INDEX) &
-                   "): cannot open coefficient file '" & COEFF_FILE & "'"
-            severity failure;
-
-        -- Skip lines belonging to earlier branches
-        for i in 0 to SKIP_LINES - 1 loop
-            assert not endfile(f)
-                report "fir_branch_parallel(BRANCH_INDEX=" &
-                       integer'image(BRANCH_INDEX) &
-                       "): unexpected EOF while skipping to slice"
-                severity failure;
-            readline(f, line_v);
+        for t in 0 to TAPS_PER_BRANCH - 1 loop
+            r(t) := signed(HAIFURAIYA_COEFFS_FLAT(
+                              BRANCH_INDEX * TAPS_PER_BRANCH + t));
         end loop;
+        return r;
+    end function;
 
-        -- Read this branch's taps
-        for i in 0 to TAPS_PER_BRANCH - 1 loop
-            assert not endfile(f)
-                report "fir_branch_parallel(BRANCH_INDEX=" &
-                       integer'image(BRANCH_INDEX) &
-                       "): unexpected EOF while reading taps"
-                severity failure;
-            readline(f, line_v);
-            hread(line_v, hex_v);
-            result_v(i) := signed(hex_v);
-        end loop;
-
-        file_close(f);
-        return result_v;
-    end function read_branch_coeffs;
-
-    constant COEFFS : coeff_array_t := read_branch_coeffs;
+    constant COEFFS : coeff_array_t := get_branch_coeffs;
 
     ---------------------------------------------------------------------------
     -- Internal signals

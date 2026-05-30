@@ -78,10 +78,15 @@ proc safe_add_files {fileset file_list {library "xil_defaultlib"}} {
 
 puts "\n--- Adding RTL sources ---"
 safe_add_files sources_1 {
+    ../../rtl/channelizer/haifuraiya_coeffs_pkg.vhd
     ../../rtl/channelizer/fir_branch_parallel.vhd
+    ../../rtl/channelizer/fir_branch_serial.vhd
     ../../rtl/channelizer/polyphase_filterbank_parallel.vhd
+    ../../rtl/channelizer/polyphase_filterbank_serial.vhd
     ../../rtl/channelizer/fft_pkg.vhd
     ../../rtl/channelizer/fft_n_pt.vhd
+    ../../rtl/channelizer/sdf_stage.vhd
+    ../../rtl/channelizer/fft_n_pt_sdf.vhd
     ../../rtl/channelizer/haifuraiya_channelizer_top.vhd
 }
 

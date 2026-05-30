@@ -13,3 +13,18 @@ haifuraiya/sim/vivado_*.jou
 haifuraiya/sim/vivado_*.log
 haifuraiya/sim/vivado_*.backup.*
 haifuraiya/syn/zcu102/synth_project/
+
+# Vivado / xsim build outputs
+**/xsim.dir/
+**/xvhdl.log
+**/xvhdl.pb
+**/*_sim_project/
+**/*.jou
+**/*.str
+
+# Synthesis logs / scratch
+haifuraiya/syn/**/synth_*.log
+haifuraiya/syn/**/baseline/
+
+# Jupyter scratch
+**/.ipynb_checkpoints/
