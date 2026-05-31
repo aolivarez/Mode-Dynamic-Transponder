@@ -1,7 +1,7 @@
 # RTL - Haifuraiya
 
 Synthesizable VHDL for the Haifuraiya 64-channel polyphase channelizer,
-the Opulent Voice ground-station front end. Vendor-agnostic design (no
+the Opulent Voice front end on haifuraiya payload. Vendor-agnostic design (no
 Xilinx LogiCORE IP), pure VHDL-93 (no 2008 features in synth-bound RTL).
 Tested-clean on ZCU102 (Zynq UltraScale+) and libresdr (Zynq-7020).
 
